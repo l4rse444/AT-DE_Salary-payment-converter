@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payroll XML Converter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f5f5f4;
+    --surface: #ffffff;
+    --border: #e7e7e4;
+    --border-strong: #d1d1cc;
+    --text: #18181b;
+    --muted: #71717a;
+    --subtle: #a1a1aa;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --accent-border: #bfdbfe;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --green-border: #bbf7d0;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --amber-border: #fde68a;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --red-border: #fecaca;
+    --at-text: #b91c1c;
+    --at-bg: #fef2f2;
+    --at-border: #fecaca;
+    --de-text: #92400e;
+    --de-bg: #fffbeb;
+    --de-border: #fde68a;
+    --mono: 'JetBrains Mono', monospace;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 24px;
+    text-align: center;
+  }
+
+  .page-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .page-header p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ── Layout ── */
+  .main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ── Step card ── */
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--text);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-num.done {
+    background: var(--green);
+  }
+
+  .step-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .step-body {
+    padding: 20px;
+  }
+
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: 8px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--bg);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .drop-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+
+  .drop-zone p {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .drop-zone small {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .browse-link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  #fileInput { display: none; }
+
+  /* ── File rows ── */
+  .file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+
+  .file-row {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .file-row.converted { border-color: var(--green-border); }
+
+  .file-row-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    background: var(--surface);
+  }
+
+  .country-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .country-tag.at { background: var(--at-bg); color: var(--at-text); border: 1px solid var(--at-border); }
+  .country-tag.de { background: var(--de-bg); color: var(--de-text); border: 1px solid var(--de-border); }
+  .country-tag.other { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+  .file-name-text {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .file-badges { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
+  .badge {
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .badge.payments { background: var(--accent-light); color: var(--accent); }
+  .badge.ok { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+  .badge.warn { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+  .badge.neutral { background: var(--bg); color: var(--muted); }
+
+  .file-row-actions {
+    display: flex;
+    gap: 6px;
+    padding: 0 14px 11px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Detection bar ── */
+  .detection-bar {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .det-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--subtle);
+    flex-shrink: 0;
+  }
+
+  .det-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .det-chip.at { color: var(--at-text); background: var(--at-bg); border-color: var(--at-border); }
+  .det-chip.de { color: var(--de-text); background: var(--de-bg); border-color: var(--de-border); }
+
+  /* ── Payment table ── */
+  .payment-panel {
+    border-top: 1px solid var(--border);
+    display: none;
+    overflow-x: auto;
+  }
+
+  .payment-panel.open { display: block; }
+
+  .panel-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-toolbar span { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .panel-toolbar-actions { display: flex; gap: 6px; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    padding: 8px 14px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 9px 14px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  td.nm { font-family: 'Inter', sans-serif; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+  .amt { text-align: right; color: var(--green); font-weight: 500; }
+
+  tr.total td {
+    font-weight: 600;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  tr.total .amt { color: var(--green); }
+
+  /* ── Step 3 summary ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .summary-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .summary-item label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .summary-item .val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    font-family: var(--mono);
+  }
+
+  .summary-item .val.green { color: var(--green); }
+
+  .empty-state {
+    text-align: center;
+    padding: 28px 20px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: var(--bg); border-color: var(--border-strong); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-size: 13px;
+    padding: 9px 20px;
+  }
+
+  .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .btn-primary:disabled { background: var(--border-strong); border-color: var(--border-strong); cursor: not-allowed; color: var(--muted); }
+
+  .btn-green { background: var(--green-light); color: var(--green); border-color: var(--green-border); }
+  .btn-green:hover { background: #dcfce7; }
+
+  .btn-ghost { color: var(--muted); }
+  .btn-ghost:hover { color: var(--red); border-color: var(--red-border); background: var(--red-light); }
+
+  .btn-convert {
+    background: var(--text);
+    color: white;
+    border-color: var(--text);
+  }
+  .btn-convert:hover { background: #27272a; }
+
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  .action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .action-row-left { display: flex; gap: 8px; flex-wrap: wrap; }
+  .action-row-right { display: flex; gap: 8px; }
+
+  /* ── Footer note ── */
+  .footer-note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--subtle);
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 540px) {
+    .summary-grid { grid-template-columns: 1fr; }
+    .file-row-main { flex-wrap: wrap; }
+    .file-badges { width: 100%; }
+    th, td { padding: 7px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Payroll XML Converter</h1>
+  <p>Convert &amp; validate Danske Bank pain.001 files · AT + DE</p>
+</div>
+
+<div class="main">
+
+  <!-- Step 1 -->
+  <div class="step-card" id="step1card">
+    <div class="step-header">
+      <div class="step-num" id="step1num">1</div>
+      <span class="step-title">Upload payment files</span>
+    </div>
+    <div class="step-body">
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-icon">📂</span>
+        <p>Drop XML files here or <span class="browse-link" onclick="document.getElementById('fileInput').click()">browse</span></p>
+        <small>.xml · pain.001</small>
+        <input type="file" id="fileInput" multiple accept=".xml">
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-card" id="step2card">
+    <div class="step-header">
+      <div class="step-num" id="step2num">2</div>
+      <span class="step-title">Review payments</span>
+    </div>
+    <div class="step-body" style="padding:0">
+      <div class="empty-state" id="step2empty">Upload files in step 1 to review payments.</div>
+      <div id="step2tables" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-card" id="step3card">
+    <div class="step-header">
+      <div class="step-num" id="step3num">3</div>
+      <span class="step-title">Convert &amp; download</span>
+    </div>
+    <div class="step-body">
+      <div id="step3empty" class="empty-state">Complete steps 1 and 2 to continue.</div>
+      <div id="step3content" style="display:none">
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div class="action-row">
+          <div class="action-row-left">
+            <button class="btn btn-convert btn-primary" id="convertAllBtn" onclick="processAll()">Convert &amp; download all</button>
+          </div>
+          <div class="action-row-right">
+            <button class="btn btn-ghost" onclick="clearAll()">Start over</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">All processing happens in your browser — no data is sent anywhere.</p>
+
+</div>
+
+<script>
+const files = new Map();
+
+function detectCountry(xmlText) {
+  const s = [];
+  if (xmlText.includes('ISO:pain.001.001.03:APC:STUZZA'))
+    s.push({ label: 'Namespace', value: 'ISO:pain.001.001.03:APC:STUZZA\u2026', type: 'at' });
+  if (xmlText.includes('AT721200010026622612'))
+    s.push({ label: 'Debtor IBAN', value: 'AT721200010026622612', type: 'at' });
+  if (xmlText.includes('BKAUATWW'))
+    s.push({ label: 'Debtor BIC', value: 'BKAUATWW', type: 'at' });
+  if (s.length) return { country: 'AT', signals: s };
+
+  if (xmlText.includes('DE12200700240162871800'))
+    s.push({ label: 'Debtor IBAN', value: 'DE12200700240162871800', type: 'de' });
+  if (xmlText.includes('DEUTDEDBHAM'))
+    s.push({ label: 'Debtor BIC', value: 'DEUTDEDBHAM', type: 'de' });
+  if (xmlText.includes('VOI TECHNOLOGY GERMANY GMBH'))
+    s.push({ label: 'Debtor name', value: 'VOI TECHNOLOGY GERMANY GMBH', type: 'de' });
+  if (s.length) return { country: 'DE', signals: s };
+
+  return { country: 'OTHER', signals: [] };
+}
+
+function transformXml(xmlText, country) {
+  let out = xmlText;
+  if (country === 'AT') {
+    out = out.replace(/xmlns="ISO:pain\.001\.001\.03:APC:STUZZA:payments:003"/g,
+      'xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03"');
+    out = out.replace(/AT721200010026622612/g, 'SE3712000000013990100165');
+    out = out.replace(/BKAUATWW/g, 'DABASESX');
+  } else if (country === 'DE') {
+    out = out.replace(/DE12200700240162871800/g, 'SE1512000000013990100173');
+    out = out.replace(/DEUTDEDBHAM/g, 'DABASESX');
+  }
+  return out;
+}
+
+function parsePayments(xmlText) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    if (doc.querySelector('parsererror')) return null;
+    const ns = doc.documentElement.namespaceURI;
+    function t(parent, tag) {
+      let els = parent.getElementsByTagNameNS(ns, tag);
+      if (!els.length) els = parent.getElementsByTagName(tag);
+      return els.length ? els[0].textContent.trim() : '';
+    }
+    const txs = [];
+    let nodes = doc.getElementsByTagNameNS(ns, 'CdtTrfTxInf');
+    if (!nodes.length) nodes = doc.getElementsByTagName('CdtTrfTxInf');
+    Array.from(nodes).forEach(el => {
+      const amt = t(el, 'InstdAmt') || t(el, 'Amt');
+      const ccyEl = el.querySelector ? el.querySelector('InstdAmt, Amt') : null;
+      txs.push({
+        endToEnd: t(el, 'EndToEndId'), name: t(el, 'Nm'),
+        iban: t(el, 'IBAN'), bic: t(el, 'BIC'),
+        amount: amt, currency: ccyEl?.getAttribute('Ccy') || 'EUR',
+        reference: t(el, 'Ustrd') || t(el, 'AddtlRmtInf') || ''
+      });
+    });
+    return txs;
+  } catch(e) { return null; }
+}
+
+function fmt(amt, ccy) {
+  const n = parseFloat(amt);
+  if (isNaN(n)) return amt || '\u2014';
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0' + (ccy || 'EUR');
+}
+
+function dl(blob, name) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  a.click();
+}
+
+function downloadXml(filename, content) {
+  dl(new Blob([content], { type: 'application/xml' }), filename.replace(/\.xml$/i, '_converted.xml'));
+}
+
+function downloadCsv(filename, payments) {
+  const H = ['EndToEndId','Name','IBAN','BIC','Amount','Currency','Reference'];
+  const rows = payments.map(p =>
+    [p.endToEnd,p.name,p.iban,p.bic,p.amount,p.currency,p.reference]
+      .map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(','));
+  dl(new Blob(['\uFEFF' + [H.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' }),
+     filename.replace(/\.xml$/i, '_payments.csv'));
+}
+
+function downloadExcel(filename, payments) {
+  const H = ['EndToEndId','Name','IBAN','BIC','Amount','Currency','Reference'];
+  const total = payments.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+  const ccy = payments[0]?.currency || 'EUR';
+  let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table>`;
+  html += `<tr>${H.map(h => `<th><b>${h}</b></th>`).join('')}</tr>`;
+  payments.forEach(p => {
+    html += `<tr>${[p.endToEnd,p.name,p.iban,p.bic,p.amount,p.currency,p.reference]
+      .map(v => `<td>${String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>`).join('')}</tr>`;
+  });
+  html += `<tr><td colspan="4"><b>TOTAL (${payments.length})</b></td><td><b>${total.toFixed(2)}</b></td><td>${ccy}</td><td></td></tr>`;
+  html += `</table></body></html>`;
+  dl(new Blob([html], { type: 'application/vnd.ms-excel' }), filename.replace(/\.xml$/i, '_payments.xls'));
+}
+
+// ── Render step 1 file rows ──────────────────────────────────────────────────
+function renderFileRows() {
+  const list = document.getElementById('fileList');
+  if (!files.size) { list.innerHTML = ''; return; }
+  list.innerHTML = [...files.keys()].map(key => {
+    const f = files.get(key);
+    const { country, signals } = f.detection;
+    const cc = country.toLowerCase();
+    const flag = country === 'AT' ? '🇦🇹 ' : country === 'DE' ? '🇩🇪 ' : '';
+    const label = country === 'AT' ? 'Austria' : country === 'DE' ? 'Germany' : 'Other';
+    const needsConv = country !== 'OTHER';
+    const statusBadge = f.processed
+      ? `<span class="badge ok">✓ Converted</span>`
+      : needsConv
+        ? `<span class="badge warn">Needs conversion</span>`
+        : `<span class="badge neutral">Pass-through</span>`;
+    const pcount = f.payments?.length || 0;
+    const payBadge = pcount ? `<span class="badge payments">${pcount} payments</span>` : '';
+    const detHtml = signals.length
+      ? signals.map(s => `<span class="det-chip ${s.type}">${s.label}: ${s.value}</span>`).join('')
+      : `<span style="font-size:12px;color:var(--subtle)">No AT/DE markers — pass-through</span>`;
+
+    return `
+    <div class="file-row ${f.processed ? 'converted' : ''}" id="frow-${CSS.escape(key)}">
+      <div class="file-row-main">
+        <span class="country-tag ${cc}">${flag}${label}</span>
+        <span class="file-name-text" title="${key}">${key}</span>
+        <div class="file-badges">${payBadge}${statusBadge}</div>
+      </div>
+      <div class="file-row-actions">
+        ${needsConv ? `<button class="btn btn-sm btn-convert" onclick="convertAndDownload('${key}')">${f.processed ? '↓ Re-download XML' : 'Convert → Download XML'}</button>` : ''}
+      </div>
+      <div class="detection-bar">
+        <span class="det-label">Detected by</span>
+        ${detHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render step 2 payment tables ─────────────────────────────────────────────
+function renderStep2() {
+  const empty = document.getElementById('step2empty');
+  const tables = document.getElementById('step2tables');
+  const filesWithPayments = [...files.values()].filter(f => f.payments?.length);
+  if (!filesWithPayments.length) {
+    empty.style.display = 'block';
+    tables.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  tables.style.display = 'block';
+  tables.innerHTML = filesWithPayments.map(f => {
+    const key = f.file.name;
+    const total = f.payments.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+    const ccy = f.payments[0]?.currency || 'EUR';
+    return `
+    <div style="border-bottom:1px solid var(--border)">
+      <div class="panel-toolbar">
+        <span>${key} · ${f.payments.length} payments · ${fmt(total.toFixed(2), ccy)}</span>
+        <div class="panel-toolbar-actions">
+          <button class="btn btn-sm btn-green" onclick="downloadExcel('${key}',files.get('${key}').payments)">↓ Excel</button>
+          <button class="btn btn-sm" onclick="downloadCsv('${key}',files.get('${key}').payments)">↓ CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Name</th><th>IBAN</th><th>BIC</th>
+          <th style="text-align:right">Amount</th><th>Reference</th>
+        </tr></thead>
+        <tbody>
+          ${f.payments.map((p,i) => `<tr>
+            <td style="color:var(--muted)">${i+1}</td>
+            <td class="nm">${p.name||'\u2014'}</td>
+            <td>${p.iban||'\u2014'}</td>
+            <td>${p.bic||'\u2014'}</td>
+            <td class="amt">${fmt(p.amount,p.currency)}</td>
+            <td style="color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                title="${(p.reference||'').replace(/"/g,'&quot;')}">${p.reference||'\u2014'}</td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td colspan="4">Total</td>
+            <td class="amt">${fmt(total.toFixed(2), ccy)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render step 3 summary ────────────────────────────────────────────────────
+function renderStep3() {
+  const empty = document.getElementById('step3empty');
+  const content = document.getElementById('step3content');
+  const grid = document.getElementById('summaryGrid');
+  const toConvert = [...files.values()].filter(f => f.detection.country !== 'OTHER');
+
+  if (!files.size) {
+    empty.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  content.style.display = 'block';
+
+  const totalPayments = [...files.values()].reduce((s,f) => s + (f.payments?.length||0), 0);
+  const totalAmt = [...files.values()].reduce((s,f) =>
+    s + (f.payments?.reduce((a,p) => a+(parseFloat(p.amount)||0),0)||0), 0);
+  const allCcy = [...files.values()].map(f => f.payments?.[0]?.currency).find(Boolean) || 'EUR';
+  const converted = toConvert.filter(f => f.processed).length;
+
+  grid.innerHTML = `
+    <div class="summary-item"><label>Files to convert</label><div class="val">${toConvert.length} of ${files.size}</div></div>
+    <div class="summary-item"><label>Converted</label><div class="val ${converted === toConvert.length && toConvert.length > 0 ? 'green' : ''}">${converted} / ${toConvert.length}</div></div>
+    <div class="summary-item"><label>Total payments</label><div class="val">${totalPayments}</div></div>
+    <div class="summary-item"><label>Total amount</label><div class="val green">${fmt(totalAmt.toFixed(2), allCcy)}</div></div>`;
+
+  // Update step numbers
+  document.getElementById('step1num').className = 'step-num' + (files.size ? ' done' : '');
+  document.getElementById('step1num').textContent = files.size ? '✓' : '1';
+  document.getElementById('step2num').className = 'step-num' + (totalPayments ? ' done' : '');
+  document.getElementById('step2num').textContent = totalPayments ? '✓' : '2';
+  document.getElementById('step3num').className = 'step-num' + (converted === toConvert.length && toConvert.length > 0 ? ' done' : '');
+  document.getElementById('step3num').textContent = (converted === toConvert.length && toConvert.length > 0) ? '✓' : '3';
+}
+
+function refresh() {
+  renderFileRows();
+  renderStep2();
+  renderStep3();
+}
+
+function convertAndDownload(key) {
+  const f = files.get(key);
+  const converted = transformXml(f.xmlText, f.detection.country);
+  f.outputXml = converted; f.processed = true;
+  downloadXml(key, converted);
+  refresh();
+}
+
+function processAll() {
+  let i = 0;
+  files.forEach((f, key) => {
+    if (f.detection.country !== 'OTHER') {
+      const converted = transformXml(f.xmlText, f.detection.country);
+      f.outputXml = converted; f.processed = true;
+      setTimeout(() => downloadXml(key, converted), i++ * 300);
+    }
+  });
+  setTimeout(refresh, i * 300 + 100);
+}
+
+function clearAll() { files.clear(); refresh(); }
+
+function loadFile(file) {
+  if (!file.name.toLowerCase().endsWith('.xml')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const xmlText = e.target.result;
+    files.set(file.name, {
+      file, xmlText,
+      detection: detectCountry(xmlText),
+      payments: parsePayments(xmlText),
+      processed: false, outputXml: null
+    });
+    refresh();
+  };
+  reader.readAsText(file);
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  [...e.dataTransfer.files].forEach(loadFile);
+});
+dropZone.addEventListener('click', e => { if (!e.target.classList.contains('browse-link') && e.target.tagName !== 'BUTTON') fileInput.click(); });
+fileInput.addEventListener('change', () => { [...fileInput.files].forEach(loadFile); fileInput.value = ''; });
+</script>
+</body>
+</html>
